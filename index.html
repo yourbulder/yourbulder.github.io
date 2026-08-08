@@ -1,0 +1,1081 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat & Tic-Tac-Toe Pro</title>
+    
+    <!-- Google AdSense Site Verification Meta Tag -->
+    <meta name="google-adsense-account" content="ca-pub-6434181265093730">
+
+    <!-- Google AdSense Global Connection Script -->
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6434181265093730" crossorigin="anonymous"></script>
+    
+    <!-- PeerJS for Private 1v1 Rooms -->
+    <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js"></script>
+    
+    <!-- Firebase for Global & Group Chat Sync -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        /* Changed body to column so Top Ad, App, and Bottom Ad stack vertically */
+        body {
+            background-color: #f0f0f0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            gap: 15px;
+            padding: 15px;
+        }
+
+        /* AD CONTAINERS (Locks in the height so the UI doesn't jump around) */
+        .ad-container {
+            width: 100%;
+            max-width: 728px; /* Standard horizontal ad size */
+            min-height: 90px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #e5e5e5;
+            border: 2px dashed #9ca3af;
+            border-radius: 10px;
+            overflow: hidden;
+            text-align: center;
+        }
+
+        .ad-placeholder-text {
+            color: #6b7280;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        /* NEW WRAPPER for Chat and Game panels */
+        .main-app-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            width: 100%;
+        }
+
+        /* --- LEFT PANEL (CHAT) --- */
+        .chat-panel {
+            width: 320px;
+            height: 600px;
+            background-color: #aae0aa;
+            border: 6px solid black;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .chat-header {
+            background-color: #2b8a3e;
+            border-bottom: 6px solid black;
+            padding: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chat-header-text {
+            background-color: white;
+            border: 4px solid black;
+            border-radius: 15px;
+            padding: 2px 10px;
+            font-weight: bold;
+        }
+        
+        .chat-mode-badge {
+            font-size: 12px;
+            color: white;
+            font-weight: bold;
+            background-color: #1e692c;
+            padding: 4px 8px;
+            border-radius: 10px;
+            border: 2px solid black;
+        }
+
+        .chat-messages {
+            flex-grow: 1;
+            padding: 15px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .msg-container {
+            display: flex;
+            flex-direction: column;
+            max-width: 85%;
+        }
+
+        .msg-container.mine {
+            align-self: flex-end;
+            align-items: flex-end;
+            margin-left: auto; 
+        }
+
+        .msg-container.theirs {
+            align-self: flex-start;
+            align-items: flex-start;
+            margin-right: auto;
+        }
+
+        .msg-name {
+            font-size: 11px;
+            font-weight: bold;
+            color: #1e692c;
+            margin-bottom: 2px;
+            padding: 0 5px;
+        }
+
+        .msg-bubble {
+            background-color: white;
+            border: 4px solid black;
+            border-radius: 20px;
+            padding: 8px 15px;
+            word-wrap: break-word;
+            font-weight: bold;
+        }
+
+        .msg-container.mine .msg-bubble {
+            border-bottom-right-radius: 5px;
+            background-color: #dcf8c6;
+        }
+
+        .msg-container.theirs .msg-bubble {
+            border-top-left-radius: 5px;
+            background-color: white;
+        }
+
+        .chat-input-area {
+            padding: 10px;
+            background-color: #aae0aa;
+            border-top: 6px solid black;
+        }
+
+        .chat-input-box {
+            display: flex;
+            background-color: white;
+            border: 4px solid black;
+            border-radius: 5px;
+            padding: 5px;
+            align-items: center;
+        }
+
+        .chat-input-box input {
+            border: none;
+            outline: none;
+            flex-grow: 1;
+            font-weight: bold;
+            width: 100%;
+        }
+
+        .send-btn {
+            background-color: #2b8a3e;
+            color: white;
+            border: 3px solid black;
+            border-radius: 5px;
+            padding: 4px 10px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-left: 5px;
+            font-size: 12px;
+        }
+        .send-btn:hover { background-color: #1e692c; }
+
+        /* --- RIGHT PANEL (LOBBY & GAME/GROUP) --- */
+        .right-panel {
+            width: 350px;
+            height: 600px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .lobby-view {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: 100%;
+        }
+
+        .login-box {
+            background-color: #72c472;
+            border: 6px solid black;
+            border-radius: 40px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            overflow: hidden;
+        }
+
+        /* SLIDER TOGGLE */
+        .toggle-container {
+            display: flex;
+            background: #1e692c;
+            border: 4px solid black;
+            border-radius: 20px;
+            position: relative;
+            margin-bottom: 10px;
+        }
+        .toggle-btn {
+            flex: 1;
+            padding: 8px;
+            text-align: center;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+            z-index: 2;
+            font-size: 14px;
+        }
+        .toggle-slider {
+            position: absolute;
+            top: 0; left: 0;
+            width: 50%;
+            height: 100%;
+            background: #4ade80;
+            border-radius: 15px;
+            transition: 0.3s ease;
+            z-index: 1;
+            border: 2px solid black;
+        }
+
+        .sliding-sections {
+            display: flex;
+            width: 200%;
+            transition: transform 0.4s ease-in-out;
+        }
+        .section {
+            width: 50%;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            padding: 0 5px;
+        }
+
+        .input-line {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .input-line input {
+            background: transparent;
+            border: none;
+            border-bottom: 4px solid black;
+            outline: none;
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+            color: white;
+            width: 90%;
+        }
+        .input-line input::placeholder { color: rgba(255,255,255,0.7); }
+
+        .action-button {
+            background-color: #2b8a3e;
+            border: 6px solid black;
+            border-radius: 20px;
+            padding: 10px;
+            text-align: center;
+            color: white;
+            font-weight: bold;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .action-button:hover { background-color: #1e692c; }
+        .btn-quit { background-color: #dc2626; margin-top: 5px;}
+        .btn-quit:hover { background-color: #991b1b; }
+
+        /* ACTIVE VIEWS */
+        .active-view {
+            display: none;
+            flex-direction: column;
+            height: 100%;
+            justify-content: space-between;
+        }
+
+        .board-container {
+            background-color: #4ade80;
+            border: 6px solid black;
+            border-radius: 30px;
+            padding: 15px;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow-y: auto;
+        }
+
+        .header-info {
+            width: 100%;
+            color: white;
+            font-weight: bold;
+            margin-bottom: 10px;
+            font-size: 14px;
+            text-align: center;
+            background: #1e692c;
+            border: 3px solid black;
+            padding: 5px;
+            border-radius: 10px;
+        }
+        
+        .admin-key-display {
+            color: #fbbf24;
+            font-size: 12px;
+            margin-top: 5px;
+            display: none;
+        }
+
+        .turn-indicator {
+            font-weight: bold;
+            font-size: 18px;
+            margin: 10px 0;
+            text-align: center;
+        }
+
+        .tic-tac-toe {
+            display: grid;
+            grid-template-columns: repeat(3, 70px);
+            grid-template-rows: repeat(3, 70px);
+            background-color: black;
+            gap: 4px;
+            border: 4px solid black;
+        }
+
+        .cell {
+            background-color: #4ade80;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 50px;
+            font-weight: bold;
+            cursor: pointer;
+            user-select: none;
+        }
+        .cell.x { color: red; }
+        .cell.o { color: #0ea5e9; }
+
+        /* GROUP ADMIN PANEL & USER MANAGEMENT */
+        .admin-panel {
+            display: none;
+            width: 100%;
+            margin-top: 10px;
+            background: white;
+            border: 4px solid black;
+            border-radius: 10px;
+            padding: 10px;
+        }
+        .admin-panel h4 { text-align: center; margin-bottom: 8px; font-size: 14px; }
+        .admin-section-title {
+            font-size: 11px;
+            font-weight: bold;
+            color: #1e692c;
+            margin: 8px 0 4px 0;
+            text-transform: uppercase;
+        }
+        .member-list { display: flex; flex-direction: column; gap: 5px; max-height: 120px; overflow-y: auto; }
+        .member-item {
+            display: flex; justify-content: space-between; align-items: center;
+            background: #f0f0f0; padding: 5px; border: 2px solid black; border-radius: 5px;
+            font-size: 12px; font-weight: bold;
+        }
+        .member-item.banned-item {
+            background: #fee2e2;
+            border-color: #dc2626;
+        }
+        .kick-btn {
+            background: #f59e0b; color: black; border: 2px solid black; 
+            border-radius: 5px; padding: 2px 5px; cursor: pointer; font-size: 10px; font-weight: bold;
+        }
+        .ban-btn {
+            background: #dc2626; color: white; border: 2px solid black; 
+            border-radius: 5px; padding: 2px 5px; cursor: pointer; font-size: 10px; font-weight: bold;
+        }
+        .unban-btn {
+            background: #16a34a; color: white; border: 2px solid black; 
+            border-radius: 5px; padding: 2px 5px; cursor: pointer; font-size: 10px; font-weight: bold;
+        }
+
+        .name-display {
+            background-color: #2b8a3e;
+            border: 6px solid black;
+            border-radius: 20px;
+            padding: 10px;
+            text-align: center;
+            color: white;
+            font-weight: bold;
+            font-size: 18px;
+            margin-top: 5px;
+        }
+
+        @media (max-width: 750px) {
+            .main-app-wrapper { flex-direction: column; }
+            .chat-panel, .right-panel { width: 100%; max-width: 350px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- TOP AD BANNER -->
+    <div class="ad-container">
+        <span class="ad-placeholder-text">Advertisement</span>
+        <!-- Top Banner Ad Unit -->
+        <ins class="adsbygoogle"
+             style="display:block; width: 100%; height: 100%;"
+             data-ad-client="ca-pub-6434181265093730"
+             data-ad-slot="5314933632"
+             data-ad-format="auto"
+             data-full-width-responsive="true"></ins>
+        <script>
+             (adsbygoogle = window.adsbygoogle || []).push({});
+        </script>
+    </div>
+
+    <!-- MAIN APP WRAPPER -->
+    <div class="main-app-wrapper">
+        
+        <!-- LEFT PANEL: CHAT -->
+        <div class="chat-panel">
+            <div class="chat-header">
+                <div class="chat-header-text">chat</div>
+                <div class="chat-mode-badge" id="chat-mode-badge">GLOBAL</div>
+            </div>
+            <div class="chat-messages" id="chat-messages"></div>
+            <div class="chat-input-area">
+                <div class="chat-input-box">
+                    <span style="margin-right: 5px;">💬</span>
+                    <input type="text" id="chat-input" placeholder="type msg" onkeypress="handleChatKeyPress(event)">
+                    <button class="send-btn" onclick="sendMessage()">SEND</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT PANEL: LOBBY & ACTIVE VIEWS -->
+        <div class="right-panel">
+            
+            <!-- LOBBY STATE -->
+            <div class="lobby-view" id="lobby-view">
+                <div class="login-box">
+                    
+                    <!-- SLIDER TOGGLE -->
+                    <div class="toggle-container">
+                        <div class="toggle-slider" id="slider"></div>
+                        <div class="toggle-btn" onclick="slideLobby(0)">1v1 Game</div>
+                        <div class="toggle-btn" onclick="slideLobby(1)">Group Chat</div>
+                    </div>
+
+                    <div class="sliding-sections" id="sliding-sections">
+                        
+                        <!-- SECTION 1: 1v1 GAME -->
+                        <div class="section">
+                            <div class="input-line"><input type="text" id="room-name" placeholder="1v1 room id"></div>
+                            <div class="input-line"><input type="password" id="room-pass" placeholder="1v1 password"></div>
+                            <div class="action-button" onclick="createRoom()">CREATE 1v1</div>
+                            <div class="action-button" onclick="joinRoom()">JOIN 1v1</div>
+                        </div>
+
+                        <!-- SECTION 2: GROUP CHAT -->
+                        <div class="section">
+                            <div class="input-line"><input type="text" id="group-name" placeholder="group id"></div>
+                            <div class="input-line"><input type="password" id="group-pass" placeholder="group pass"></div>
+                            <div class="action-button" style="background:#0ea5e9" onclick="createGroup()">CREATE GROUP</div>
+                            <div class="action-button" style="background:#0284c7" onclick="joinGroup()">JOIN GROUP</div>
+                        </div>
+
+                    </div>
+                </div>
+                
+                <div>
+                    <div class="input-line" style="background-color: #2b8a3e; border: 6px solid black; border-radius: 30px; padding: 15px;">
+                        <input type="text" id="your-name" placeholder="your name (required)">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 1V1 GAME VIEW -->
+            <div class="active-view" id="game-view">
+                <div class="board-container">
+                    <div class="header-info">
+                        1v1 ROOM :- <span id="display-room-id"></span><br>
+                        PASS :- <span id="display-room-pass"></span>
+                    </div>
+                    <div class="turn-indicator" id="turn-indicator">WAITING...</div>
+                    <div class="tic-tac-toe" id="board">
+                        <div class="cell" onclick="makeMove(0)"></div><div class="cell" onclick="makeMove(1)"></div><div class="cell" onclick="makeMove(2)"></div>
+                        <div class="cell" onclick="makeMove(3)"></div><div class="cell" onclick="makeMove(4)"></div><div class="cell" onclick="makeMove(5)"></div>
+                        <div class="cell" onclick="makeMove(6)"></div><div class="cell" onclick="makeMove(7)"></div><div class="cell" onclick="makeMove(8)"></div>
+                    </div>
+                </div>
+                <div class="action-button" onclick="requestNewGame()">NEW GAME</div>
+                <div class="action-button btn-quit" onclick="quitRoom()">QUIT ROOM</div>
+                <div class="name-display" id="display-name-game"></div>
+            </div>
+
+            <!-- GROUP CHAT VIEW -->
+            <div class="active-view" id="group-view">
+                <div class="board-container">
+                    <div class="header-info">
+                        GROUP ID :- <span id="display-group-id"></span><br>
+                        PASS :- <span id="display-group-pass"></span>
+                        <div class="admin-key-display" id="admin-key-display">ADMIN KEY: <span id="display-admin-key"></span></div>
+                    </div>
+                    
+                    <h3 style="margin-top:10px;">GROUP ACTIVE</h3>
+                    <p style="font-size:12px; text-align:center; margin-bottom:10px;">Chat is linked to the left panel.</p>
+
+                    <!-- ADMIN PANEL -->
+                    <div class="admin-panel" id="admin-panel">
+                        <h4>👑 Admin Controls</h4>
+                        
+                        <div class="admin-section-title">Active Members</div>
+                        <div class="member-list" id="member-list"></div>
+
+                        <div class="admin-section-title">Banned Players</div>
+                        <div class="member-list" id="banned-list"></div>
+                    </div>
+                </div>
+
+                <!-- CLAIM ADMIN SECTION -->
+                <div id="claim-admin-section" style="display: none; flex-direction: column; gap: 5px; margin-top: 10px; margin-bottom: 5px;">
+                    <input type="text" id="admin-key-input" placeholder="enter admin key" style="text-align:center; padding:8px; border:3px solid black; border-radius:15px; font-weight:bold; font-size:14px; outline:none;">
+                    <div class="action-button" style="background:#fbbf24; color:black; font-size:14px; padding:8px;" onclick="claimAdmin()">CLAIM ADMIN</div>
+                </div>
+
+                <div class="action-button btn-quit" onclick="quitGroup()">QUIT GROUP</div>
+                <div class="name-display" id="display-name-group"></div>
+            </div>
+        </div>
+    </div> <!-- END MAIN APP WRAPPER -->
+
+    <!-- BOTTOM AD BANNER -->
+    <div class="ad-container">
+        <span class="ad-placeholder-text">Advertisement</span>
+        <!-- Bottom Banner Ad Unit (Reusing the same code) -->
+        <ins class="adsbygoogle"
+             style="display:block; width: 100%; height: 100%;"
+             data-ad-client="ca-pub-6434181265093730"
+             data-ad-slot="5314933632"
+             data-ad-format="auto"
+             data-full-width-responsive="true"></ins>
+        <script>
+             (adsbygoogle = window.adsbygoogle || []).push({});
+        </script>
+    </div>
+
+    <!-- YOUR JS LOGIC REMAINS EXACTLY THE SAME BELOW -->
+    <script>
+        // ==========================================
+        // FIREBASE SETUP
+        // ==========================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyDaFggwGKQJswcouN6l4LCTV6uapi4ivaQ",
+            authDomain: "whatshapp-94037.firebaseapp.com",
+            databaseURL: "https://whatshapp-94037-default-rtdb.firebaseio.com", 
+            projectId: "whatshapp-94037",
+            storageBucket: "whatshapp-94037.firebasestorage.app",
+            messagingSenderId: "882905744267",
+            appId: "1:882905744267:web:6118488a9d8170120ce58e",
+            measurementId: "G-KM4RT7161E"
+        };
+
+        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        // System States
+        let chatMode = 'GLOBAL'; 
+        let myName = "Player";
+        
+        // Chat Arrays
+        let globalChat = [];
+        let p2pChat = [];
+        let groupChat = [];
+
+        // 1v1 Game Variables
+        let peer = null, connection = null, friendName = "Friend", isHost = false;
+        let board = ["", "", "", "", "", "", "", "", ""];
+        let mySymbol = "X", currentTurn = "X", gameActive = true;
+
+        // Group Variables
+        let currentGroupId = null;
+        let isGroupAdmin = false;
+        let groupListeners = [];
+
+        // UI Elements
+        const lobbyView = document.getElementById('lobby-view');
+        const gameView = document.getElementById('game-view');
+        const groupView = document.getElementById('group-view');
+        const chatMessages = document.getElementById('chat-messages');
+        const chatModeBadge = document.getElementById('chat-mode-badge');
+        const nameInput = document.getElementById('your-name');
+
+        window.onload = () => {
+            const savedName = localStorage.getItem('karanUsername');
+            if (savedName) { nameInput.value = savedName; myName = savedName; }
+            renderChat();
+        };
+
+        // UI: SLIDER LOGIC
+        function slideLobby(index) {
+            const sections = document.getElementById('sliding-sections');
+            const slider = document.getElementById('slider');
+            if(index === 0) {
+                sections.style.transform = 'translateX(0)';
+                slider.style.left = '0';
+            } else {
+                sections.style.transform = 'translateX(-50%)';
+                slider.style.left = '50%';
+            }
+        }
+
+        function validateName() {
+            myName = nameInput.value.trim();
+            if (!myName) { alert("Please enter 'your name' at the bottom first!"); return false; }
+            localStorage.setItem('karanUsername', myName);
+            return true;
+        }
+
+        // ==========================================
+        // 💬 GLOBAL CHAT LOGIC
+        // ==========================================
+        db.ref("global_chat").on("child_added", (snapshot) => {
+            const data = snapshot.val();
+            const currentName = nameInput.value.trim();
+            const isMine = (data.sender === currentName && currentName !== "");
+            globalChat.push({ sender: data.sender, msg: data.msg, isMine: isMine });
+            
+            if (chatMode === 'GLOBAL') addMessageToUI(data.sender, data.msg, isMine);
+        });
+
+        // ==========================================
+        // 👥 GROUP CHAT LOGIC & ADMIN MANAGEMENT
+        // ==========================================
+        function getSanitizedId(prefix, type) {
+            const id = document.getElementById(`${type}-name`).value.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+            return id ? `${prefix}-${id}` : null;
+        }
+
+        async function createGroup() {
+            if(!validateName()) return;
+            const rawId = document.getElementById('group-name').value.trim();
+            const rawPass = document.getElementById('group-pass').value.trim();
+            if(!rawId || !rawPass) return alert("Enter Group ID and Password!");
+
+            const groupId = getSanitizedId('group', 'group');
+            
+            const snapshot = await db.ref(`groups/${groupId}`).once('value');
+            if (snapshot.exists()) return alert("Group ID already exists! Try joining or pick a new name.");
+
+            const adminKey = Math.floor(1000 + Math.random() * 9000).toString();
+            
+            await db.ref(`groups/${groupId}`).set({
+                settings: { pass: rawPass, admin: myName, adminKey: adminKey },
+                members: { [myName]: true }
+            });
+
+            isGroupAdmin = true;
+            setupGroup(groupId, rawId, rawPass, adminKey);
+            appendSystemMessage("You created the group. You are the Admin.");
+        }
+
+        async function joinGroup() {
+            if(!validateName()) return;
+            const rawId = document.getElementById('group-name').value.trim();
+            const rawPass = document.getElementById('group-pass').value.trim();
+            if(!rawId || !rawPass) return alert("Enter Group ID and Password!");
+
+            const groupId = getSanitizedId('group', 'group');
+
+            const snapshot = await db.ref(`groups/${groupId}`).once('value');
+            if (!snapshot.exists()) return alert("Group not found!");
+            
+            const groupData = snapshot.val();
+            if (groupData.settings.pass !== rawPass) return alert("Wrong Group Password!");
+            
+            if (groupData.banned && groupData.banned[myName]) {
+                return alert("You are BANNED from this group and cannot join back!");
+            }
+
+            await db.ref(`groups/${groupId}/members/${myName}`).set(true);
+            
+            isGroupAdmin = false;
+            setupGroup(groupId, rawId, rawPass, null);
+            db.ref(`groups/${groupId}/chat`).push({ sender: "System", msg: `${myName} joined the group!` });
+        }
+
+        function setupGroup(groupId, rawId, rawPass, adminKey) {
+            currentGroupId = groupId;
+            chatMode = 'GROUP';
+            groupChat = [];
+            
+            lobbyView.style.display = 'none';
+            groupView.style.display = 'flex';
+            document.getElementById('display-group-id').innerText = rawId;
+            document.getElementById('display-group-pass').innerText = rawPass;
+            document.getElementById('display-name-group').innerText = myName;
+            
+            chatModeBadge.innerText = "GROUP CHAT";
+            chatModeBadge.style.backgroundColor = "#0ea5e9";
+            
+            if (isGroupAdmin) {
+                enableAdminFeatures(adminKey);
+            } else {
+                document.getElementById('admin-key-display').style.display = 'none';
+                document.getElementById('admin-panel').style.display = 'none';
+                document.getElementById('claim-admin-section').style.display = 'flex';
+            }
+
+            db.ref(`groups/${groupId}/members/${myName}`).onDisconnect().remove();
+
+            const chatRef = db.ref(`groups/${groupId}/chat`);
+            chatRef.on('child_added', (snap) => {
+                const data = snap.val();
+                const isMine = (data.sender === myName);
+                groupChat.push({ sender: data.sender, msg: data.msg, isMine: isMine });
+                if(chatMode === 'GROUP') {
+                    if (data.sender === "System") appendSystemMessage(data.msg);
+                    else addMessageToUI(data.sender, data.msg, isMine);
+                }
+            });
+            groupListeners.push({ ref: chatRef, event: 'child_added' });
+
+            const kickRef = db.ref(`groups/${groupId}/kicked/${myName}`);
+            kickRef.on('value', (snap) => {
+                if (snap.exists() && snap.val() === true) {
+                    kickRef.remove();
+                    alert("You were kicked by an Admin! You can rejoin using the password.");
+                    quitGroup(true);
+                }
+            });
+            groupListeners.push({ ref: kickRef, event: 'value' });
+
+            const banRef = db.ref(`groups/${groupId}/banned/${myName}`);
+            banRef.on('value', (snap) => {
+                if (snap.exists() && snap.val() === true) {
+                    alert("You have been BANNED from this group by an Admin!");
+                    quitGroup(true);
+                }
+            });
+            groupListeners.push({ ref: banRef, event: 'value' });
+
+            renderChat();
+        }
+
+        function enableAdminFeatures(adminKey) {
+            document.getElementById('admin-key-display').style.display = 'block';
+            document.getElementById('display-admin-key').innerText = adminKey;
+            document.getElementById('admin-panel').style.display = 'block';
+            document.getElementById('claim-admin-section').style.display = 'none';
+            
+            const memRef = db.ref(`groups/${currentGroupId}/members`);
+            memRef.on('value', (snap) => {
+                const members = snap.val() || {};
+                const listHtml = document.getElementById('member-list');
+                listHtml.innerHTML = '';
+                Object.keys(members).forEach(mem => {
+                    if(mem !== myName) {
+                        listHtml.innerHTML += `
+                            <div class="member-item">
+                                <span>${mem}</span>
+                                <div style="display:flex; gap:4px;">
+                                    <button class="kick-btn" onclick="kickMember('${mem}')">KICK</button>
+                                    <button class="ban-btn" onclick="banMember('${mem}')">BAN</button>
+                                </div>
+                            </div>
+                        `;
+                    }
+                });
+                if (!listHtml.innerHTML) listHtml.innerHTML = `<div style="font-size:11px; color:gray; text-align:center;">No other active members</div>`;
+            });
+            groupListeners.push({ ref: memRef, event: 'value' });
+
+            const bannedRef = db.ref(`groups/${currentGroupId}/banned`);
+            bannedRef.on('value', (snap) => {
+                const banned = snap.val() || {};
+                const bannedHtml = document.getElementById('banned-list');
+                bannedHtml.innerHTML = '';
+                Object.keys(banned).forEach(mem => {
+                    bannedHtml.innerHTML += `
+                        <div class="member-item banned-item">
+                            <span>🚫 ${mem}</span>
+                            <button class="unban-btn" onclick="unbanMember('${mem}')">🔓 UNBAN</button>
+                        </div>
+                    `;
+                });
+                if (!bannedHtml.innerHTML) bannedHtml.innerHTML = `<div style="font-size:11px; color:gray; text-align:center;">No banned users</div>`;
+            });
+            groupListeners.push({ ref: bannedRef, event: 'value' });
+        }
+
+        async function claimAdmin() {
+            if(isGroupAdmin) return;
+            const keyInput = document.getElementById('admin-key-input').value.trim();
+            if(!keyInput) return alert("Enter the admin key first!");
+
+            const snap = await db.ref(`groups/${currentGroupId}/settings/adminKey`).once('value');
+            if (!snap.exists()) return alert("This group was created before admin keys were added! Please create a NEW group.");
+
+            if(String(snap.val()) === String(keyInput)) {
+                isGroupAdmin = true;
+                alert("Success! You are now an Admin.");
+                document.getElementById('admin-key-input').value = "";
+                enableAdminFeatures(keyInput);
+            } else {
+                alert("Incorrect Admin Key!");
+            }
+        }
+
+        function kickMember(memberName) {
+            if(!isGroupAdmin) return;
+            db.ref(`groups/${currentGroupId}/kicked/${memberName}`).set(true);
+            db.ref(`groups/${currentGroupId}/members/${memberName}`).remove();
+            db.ref(`groups/${currentGroupId}/chat`).push({ sender: "System", msg: `${memberName} was kicked by an Admin.` });
+        }
+
+        function banMember(memberName) {
+            if(!isGroupAdmin) return;
+            db.ref(`groups/${currentGroupId}/banned/${memberName}`).set(true);
+            db.ref(`groups/${currentGroupId}/members/${memberName}`).remove();
+            db.ref(`groups/${currentGroupId}/chat`).push({ sender: "System", msg: `${memberName} was BANNED by an Admin.` });
+        }
+
+        function unbanMember(memberName) {
+            if(!isGroupAdmin) return;
+            db.ref(`groups/${currentGroupId}/banned/${memberName}`).remove();
+            db.ref(`groups/${currentGroupId}/chat`).push({ sender: "System", msg: `${memberName} was unbanned by an Admin.` });
+        }
+
+        async function quitGroup(wasRemoved = false) {
+            if (currentGroupId) {
+                groupListeners.forEach(listener => listener.ref.off(listener.event));
+                groupListeners = [];
+
+                if (!wasRemoved) {
+                    db.ref(`groups/${currentGroupId}/chat`).push({ sender: "System", msg: `${myName} left the group.` });
+                    await db.ref(`groups/${currentGroupId}/members/${myName}`).remove();
+                }
+            }
+            
+            db.ref(`groups/${currentGroupId}/members/${myName}`).onDisconnect().cancel();
+            
+            currentGroupId = null;
+            isGroupAdmin = false;
+            chatMode = 'GLOBAL';
+            
+            groupView.style.display = 'none';
+            lobbyView.style.display = 'flex';
+            chatModeBadge.innerText = "GLOBAL";
+            chatModeBadge.style.backgroundColor = "#1e692c";
+            
+            renderChat();
+        }
+
+        // ==========================================
+        // 🎮 1v1 PRIVATE ROOM LOGIC (PEERJS)
+        // ==========================================
+        function cleanPeer() {
+            if (connection) { connection.close(); connection = null; }
+            if (peer) { peer.destroy(); peer = null; }
+        }
+
+        function createRoom() {
+            if(!validateName()) return;
+            const rid = document.getElementById('room-name').value.trim();
+            const rp = document.getElementById('room-pass').value.trim();
+            if(!rid || !rp) return alert("Enter room name and password!");
+            
+            cleanPeer();
+            isHost = true; mySymbol = "X";
+            
+            peer = new Peer(getSanitizedId('karan', 'room')); 
+            peer.on('open', () => {
+                switchToGameView();
+                appendSystemMessage("Room created. Waiting for opponent...");
+            });
+            peer.on('connection', (conn) => { connection = conn; setupConnectionListeners(); });
+            peer.on('error', () => { alert("Room Error. It might exist already."); quitRoom(); });
+        }
+
+        function joinRoom() {
+            if(!validateName()) return;
+            const rid = document.getElementById('room-name').value.trim();
+            const rp = document.getElementById('room-pass').value.trim();
+            if(!rid || !rp) return alert("Enter room name and password!");
+
+            cleanPeer();
+            isHost = false; mySymbol = "O";
+            
+            peer = new Peer(); 
+            peer.on('open', () => {
+                connection = peer.connect(getSanitizedId('karan', 'room'));
+                connection.on('open', () => {
+                    setupConnectionListeners();
+                    connection.send({ type: 'handshake', name: myName });
+                });
+            });
+            peer.on('error', () => { alert("Could not connect! Room not found."); quitRoom(); });
+        }
+
+        function setupConnectionListeners() {
+            connection.on('data', (data) => {
+                if (data.type === 'handshake') {
+                    friendName = data.name;
+                    if (friendName === myName) myName += "_" + Math.floor(Math.random() * 100);
+                    connection.send({ type: 'handshake-reply', approvedName: myName, hostName: myName });
+                    finalizeRoomJoin();
+                } else if (data.type === 'handshake-reply') {
+                    myName = data.approvedName; friendName = data.hostName;
+                    finalizeRoomJoin();
+                } else if (data.type === 'chat') {
+                    p2pChat.push({ sender: data.sender, msg: data.msg, isMine: false });
+                    if(chatMode === 'P2P') addMessageToUI(data.sender, data.msg, false);
+                } else if (data.type === 'move') receiveMove(data.index, data.symbol);
+                else if (data.type === 'new-game') { resetBoard(); appendSystemMessage(`${friendName} started a new game!`); }
+            });
+            connection.on('close', () => { alert("Opponent disconnected."); quitRoom(); });
+        }
+
+        function finalizeRoomJoin() {
+            switchToGameView();
+            appendSystemMessage(`${friendName} joined the room!`);
+            resetBoard();
+        }
+
+        function switchToGameView() {
+            chatMode = 'P2P';
+            p2pChat = [];
+            lobbyView.style.display = 'none';
+            gameView.style.display = 'flex';
+            document.getElementById('display-name-game').innerText = myName;
+            document.getElementById('display-room-id').innerText = document.getElementById('room-name').value;
+            document.getElementById('display-room-pass').innerText = document.getElementById('room-pass').value;
+            chatModeBadge.innerText = "PRIVATE 1V1";
+            chatModeBadge.style.backgroundColor = "#dc2626";
+            renderChat();
+        }
+
+        function quitRoom() {
+            chatMode = 'GLOBAL';
+            if (connection) connection.close();
+            cleanPeer();
+            lobbyView.style.display = 'flex';
+            gameView.style.display = 'none';
+            chatModeBadge.innerText = "GLOBAL";
+            chatModeBadge.style.backgroundColor = "#1e692c";
+            resetBoard();
+            renderChat();
+        }
+
+        // ==========================================
+        // 💬 CHAT MESSAGING & RENDERING
+        // ==========================================
+        function handleChatKeyPress(event) { if (event.key === 'Enter') sendMessage(); }
+
+        function sendMessage() {
+            if (!validateName()) return;
+            const input = document.getElementById('chat-input');
+            const msg = input.value.trim();
+            if (!msg) return;
+
+            if (chatMode === 'P2P' && connection && connection.open) {
+                connection.send({ type: 'chat', msg: msg, sender: myName });
+                p2pChat.push({ sender: myName, msg: msg, isMine: true });
+                addMessageToUI(myName, msg, true);
+            } 
+            else if (chatMode === 'GROUP' && currentGroupId) {
+                db.ref(`groups/${currentGroupId}/chat`).push({ sender: myName, msg: msg });
+            } 
+            else if (chatMode === 'GLOBAL') {
+                db.ref("global_chat").push({ sender: myName, msg: msg });
+            }
+            input.value = '';
+        }
+
+        function addMessageToUI(sender, msg, isMine) {
+            const container = document.createElement('div');
+            container.className = `msg-container ${isMine ? 'mine' : 'theirs'}`;
+            container.innerHTML = `<div class="msg-name">${sender}</div><div class="msg-bubble">${msg}</div>`;
+            chatMessages.appendChild(container);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function appendSystemMessage(msg) {
+            const div = document.createElement('div');
+            div.style.cssText = 'text-align:center; font-size:12px; color:gray; margin:5px 0; font-weight:bold;';
+            div.innerText = msg;
+            chatMessages.appendChild(div);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function renderChat() {
+            chatMessages.innerHTML = "";
+            let activeChat = globalChat;
+            if (chatMode === 'P2P') { activeChat = p2pChat; appendSystemMessage("--- 1v1 PRIVATE CHAT ---"); }
+            else if (chatMode === 'GROUP') { activeChat = groupChat; appendSystemMessage("--- GROUP CHAT ---"); }
+            else appendSystemMessage("--- GLOBAL LIVE CHAT ---");
+
+            activeChat.forEach(c => addMessageToUI(c.sender, c.msg, c.isMine));
+        }
+
+        // ==========================================
+        // 🎲 TIC TAC TOE GAME LOGIC
+        // ==========================================
+        const cells = document.querySelectorAll('.cell');
+        const turnInd = document.getElementById('turn-indicator');
+
+        function makeMove(index) {
+            if (chatMode !== 'P2P' || !connection || !connection.open) return alert("Wait for opponent!");
+            if (!gameActive || board[index] !== "" || currentTurn !== mySymbol) return;
+            updateBoard(index, mySymbol);
+            connection.send({ type: 'move', index: index, symbol: mySymbol });
+            checkWinner();
+        }
+
+        function receiveMove(index, symbol) { updateBoard(index, symbol); checkWinner(); }
+
+        function updateBoard(index, symbol) {
+            board[index] = symbol;
+            cells[index].innerText = symbol;
+            cells[index].classList.add(symbol.toLowerCase());
+            currentTurn = currentTurn === "X" ? "O" : "X";
+            if (connection && connection.open) {
+                turnInd.innerText = currentTurn === mySymbol ? `YOUR TURN :- ${mySymbol}` : `${friendName}'S TURN :- ${currentTurn}`;
+            }
+        }
+
+        function checkWinner() {
+            const wins = [[0,1,2], [3,4,5], [6,7,8], [0,3,6], [1,4,7], [2,5,8], [0,4,8], [2,4,6]];
+            let won = false;
+            for (let [a,b,c] of wins) if (board[a] && board[a] === board[b] && board[a] === board[c]) won = true;
+            
+            if (won) { turnInd.innerText = currentTurn !== mySymbol ? "YOU WON! 🎉" : "YOU LOST! 😢"; gameActive = false; }
+            else if (!board.includes("")) { turnInd.innerText = "IT'S A DRAW!"; gameActive = false; }
+        }
+
+        function requestNewGame() {
+            if (connection && connection.open) { connection.send({ type: 'new-game' }); resetBoard(); }
+        }
+
+        function resetBoard() {
+            board = ["", "", "", "", "", "", "", "", ""]; gameActive = true; currentTurn = "X";
+            cells.forEach(c => { c.innerText = ""; c.className = "cell"; });
+            if (chatMode === 'P2P') turnInd.innerText = currentTurn === mySymbol ? `YOUR TURN :- ${mySymbol}` : `${friendName}'S TURN :- ${currentTurn}`;
+            else turnInd.innerText = "WAITING...";
+        }
+    </script>
+</body>
+</html>
